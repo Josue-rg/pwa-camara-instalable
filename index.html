@@ -6,6 +6,7 @@
   <meta name="description" content="Captura de evidencia fotográfica con acceso consciente a cámara.">
   <meta name="theme-color" content="#0f172a">
 
+  <!-- A1. Manifest + HTTPS son lo que hace instalable a la PWA. -->
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -26,10 +27,12 @@
         <h2 id="titulo-instalacion">Instalar aplicación</h2>
       </div>
 
+      <!-- A1. Nace oculto; aparece cuando el navegador avisa (A3). -->
       <button id="btn-instalar" class="btn btn-primario" type="button" hidden>
         Instalar App
       </button>
 
+      <!-- A7. Solo en iPhone/iPad: ahí no existe el diálogo automático. -->
       <div id="instrucciones-ios" class="aviso aviso-ios" hidden>
         <strong>En iPhone o iPad:</strong> Safari no permite instalar mediante JavaScript.
         Pulsa el botón <strong>Compartir</strong> y selecciona <strong>Agregar a inicio</strong>.
@@ -46,12 +49,14 @@
       </p>
 
       <div id="visor-contenedor" class="visor-contenedor">
+        <!-- B7. El stream que devuelve getUserMedia se conecta aquí. -->
         <video id="visor-camara" autoplay playsinline muted></video>
         <div class="visor-vacio" aria-hidden="true">
           La vista previa aparecerá aquí
         </div>
       </div>
 
+      <!-- B1. Estos botones arrancan el flujo de la cámara. -->
       <div class="controles">
         <button id="btn-preparar-camara" class="btn btn-primario" type="button">
           Solicitar acceso a cámara
@@ -64,6 +69,7 @@
         </button>
       </div>
 
+      <!-- B2. Aviso propio antes de pedir el permiso nativo (B6). -->
       <div id="aviso-permiso" class="aviso" role="dialog" aria-modal="false" aria-labelledby="titulo-aviso" hidden>
         <h3 id="titulo-aviso">Antes de encender la cámara</h3>
         <p>
@@ -86,6 +92,7 @@
     </section>
   </main>
 
+  <!-- A2 y B: aquí se enganchan los listeners y, al cargar, el SW (A2). -->
   <script src="./app.js"></script>
 </body>
 </html>

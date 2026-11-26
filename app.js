@@ -1,7 +1,18 @@
 'use strict';
 
+// ============================================================
+// app.js — FLUJOS A (instalar la app) y B (encender la cámara)
+// Aquí vive todo lo que ve y toca el usuario: mostrar botones,
+// pedir la cámara y administrar el stream de video.
+// El cache del shell (C1-C3) está en sw.js.
+// ============================================================
+
+// Evento que el navegador entrega una sola vez para poder instalar (A3).
 let eventoInstalacionDiferido = null;
 
+// Estado de la cámara.
+// tokenCamara invalida solicitudes viejas: si pides la frontal y de
+// inmediato la trasera, la respuesta atrasada se descarta (B7).
 let streamActual = null;
 let modoCamaraActual = 'environment';
 let tokenCamara = 0;
@@ -29,6 +40,8 @@ function actualizarMensajeEstado(texto) {
   }
 }
 
+// Refleja el estado real en la UI: qué botón se puede pulsar, qué
+// texto lleva y si el visor se dibuja como activo.
 function actualizarEstadoBotones(camaraActiva) {
   btnPrepararCamara.disabled = camaraActiva || solicitandoCamara;
   btnAlternarCamara.disabled = !camaraActiva || solicitandoCamara;
@@ -40,6 +53,9 @@ function actualizarEstadoBotones(camaraActiva) {
   visorContenedor.classList.toggle('frontal', modoCamaraActual === 'user' && camaraActiva);
 }
 
+// Apaga el stream de verdad: detiene cada track (eso libera el sensor
+// y apaga el indicador de la cámara) y suelta el <video>.
+// Lo usan B5 (antes de cambiar), B11 (apagar) y B12 (salir).
 function detenerCamaraActiva() {
   if (streamActual) {
     streamActual.getTracks().forEach(function (track) {
@@ -55,6 +71,7 @@ function detenerCamaraActiva() {
   actualizarEstadoBotones(false);
 }
 
+// B8. Traduce el error técnico del navegador a un mensaje entendible.
 function diagnosticarErrorCamara(error) {
   const nombre = error && error.name ? error.name : 'ErrorDesconocido';
 
@@ -77,6 +94,8 @@ function diagnosticarErrorCamara(error) {
   return 'Error al acceder al hardware: ' + (error && error.message ? error.message : nombre);
 }
 
+// B5. Arranque de la cámara. Valida la API, invalida lo anterior
+// y deja todo listo para pedir el stream.
 function iniciarCamara(modo) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     actualizarMensajeEstado('Tu navegador no expone la API de cámara. Abre la PWA desde una URL HTTPS.');
@@ -91,6 +110,7 @@ function iniciarCamara(modo) {
   actualizarMensajeEstado('Preparando cámara ' + nombreModo(modo) + '...');
   actualizarEstadoBotones(false);
 
+  // B6. Restricciones: solo video y facingMode elige trasera o frontal.
   const restricciones = {
     video: { facingMode: modo },
     audio: false
@@ -98,9 +118,12 @@ function iniciarCamara(modo) {
 
   return Promise.resolve()
     .then(function () {
+      // B6. Aquí el navegador pide permiso y entrega el stream.
       return navigator.mediaDevices.getUserMedia(restricciones);
     })
     .then(function (stream) {
+      // B7. Llegó el stream: si mientras tanto se pidió otra lente,
+      // se descarta para no encender la cámara equivocada.
       if (token !== tokenCamara) {
         stream.getTracks().forEach(function (track) {
           track.stop();
@@ -124,6 +147,7 @@ function iniciarCamara(modo) {
       return true;
     })
     .catch(function (error) {
+      // B8. No se pudo: se explica el motivo y la cámara queda apagada.
       if (token !== tokenCamara) {
         return false;
       }
@@ -133,6 +157,7 @@ function iniciarCamara(modo) {
       return false;
     })
     .finally(function () {
+      // B9. Pase lo que pase, se sueltan los botones y se reajusta la UI.
       if (token !== tokenCamara) {
         return;
       }
@@ -142,6 +167,8 @@ function iniciarCamara(modo) {
     });
 }
 
+// A7. iPhone/iPad no permiten instalar por JavaScript: se muestra
+// la guía manual (Compartir > Agregar a inicio).
 function verificarEntornoIOS() {
   const esIOS = (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -157,6 +184,7 @@ function verificarEntornoIOS() {
   return esIOS;
 }
 
+// A2. Registra el SW. Sin él la app no es instalable; el cache lo hace sw.js.
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     return;
@@ -171,12 +199,15 @@ function registrarServiceWorker() {
     });
 }
 
+// A3. El navegador avisa que la app cumple los requisitos: se guarda
+// el evento (solo se puede usar una vez) y se muestra el botón.
 window.addEventListener('beforeinstallprompt', function (event) {
-  event.preventDefault();
+  event.preventDefault(); // A3. Sin banner automático: el usuario decide.
   eventoInstalacionDiferido = event;
   btnInstalar.hidden = false;
 });
 
+// A4. Se abre el diálogo nativo de instalación.
 btnInstalar.addEventListener('click', function () {
   if (!eventoInstalacionDiferido) {
     btnInstalar.hidden = true;
@@ -194,6 +225,7 @@ btnInstalar.addEventListener('click', function () {
       return evento.userChoice;
     })
     .then(function (resultado) {
+      // A5. accepted = instalada; dismissed = se guarda para reintentar.
       if (resultado && resultado.outcome === 'accepted') {
         btnInstalar.hidden = true;
         actualizarMensajeEstado('Aplicación instalada. Ábrela desde la pantalla de inicio.');
@@ -208,11 +240,13 @@ btnInstalar.addEventListener('click', function () {
     });
 });
 
+// A6. Confirmación del navegador: la app ya quedó instalada.
 window.addEventListener('appinstalled', function () {
   btnInstalar.hidden = true;
   guiaIOSOculta();
 });
 
+// Oculta la guía de iOS cuando la app ya está instalada (A6).
 function guiaIOSOculta() {
   const guiaIOS = document.getElementById('instrucciones-ios');
   if (guiaIOS) {
@@ -220,22 +254,27 @@ function guiaIOSOculta() {
   }
 }
 
+// B2. Primero el aviso propio (permiso consciente); el permiso
+// nativo del navegador viene hasta B6.
 btnPrepararCamara.addEventListener('click', function () {
   lenteSolicitado.textContent = nombreModo(modoCamaraActual);
   avisoPermiso.hidden = false;
   btnConfirmarPermiso.focus();
 });
 
+// B3. Canceló el aviso: no se toca el hardware.
 btnCancelarPermiso.addEventListener('click', function () {
   avisoPermiso.hidden = true;
   actualizarMensajeEstado('Solicitud cancelada. La cámara sigue apagada.');
 });
 
+// B4. Aceptó el aviso: recién aquí se pide la cámara.
 btnConfirmarPermiso.addEventListener('click', function () {
   avisoPermiso.hidden = true;
   iniciarCamara(modoCamaraActual);
 });
 
+// B10. Cambia de lente y reinicia el stream (vuelve a B5).
 btnAlternarCamara.addEventListener('click', function () {
   if (solicitandoCamara) {
     return;
@@ -246,6 +285,7 @@ btnAlternarCamara.addEventListener('click', function () {
   iniciarCamara(modoCamaraActual);
 });
 
+// B11. Apagado manual: invalida lo pendiente y libera el sensor.
 btnApagarCamara.addEventListener('click', function () {
   tokenCamara += 1;
   solicitandoCamara = false;
@@ -253,12 +293,16 @@ btnApagarCamara.addEventListener('click', function () {
   actualizarMensajeEstado('Cámara apagada. El sensor se ha liberado correctamente.');
 });
 
+// B12. Al salir de la app también se libera el sensor.
 window.addEventListener('pagehide', function () {
   tokenCamara += 1;
   solicitandoCamara = false;
   detenerCamaraActiva();
 });
 
+// A7. Se revisa el entorno al cargar (iOS / ya instalada).
 verificarEntornoIOS();
+// Estado inicial: cámara apagada y botones coherentes.
 actualizarEstadoBotones(false);
+// A2. El SW se registra al final para no competir con el primer render.
 window.addEventListener('load', registrarServiceWorker);
